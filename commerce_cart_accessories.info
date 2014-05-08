@@ -1,0 +1,7 @@
+name = Commerce Cart Accessories
+description = Lists a product's accessories under the main product in the cart so they are easy to find and add 
+core = 7.x
+dependencies[] = entityreference
+files[] = includes/views/handlers/commerce_cart_accessories_handler_field_edit_quantity.inc
+files[] = includes/views/handlers/commerce_cart_accessories_handler_field_edit_delete.inc
+files[] = includes/views/handlers/commerce_cart_accessories_handler_field_line_item_total.inc

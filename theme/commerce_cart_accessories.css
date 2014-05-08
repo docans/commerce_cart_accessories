@@ -1,0 +1,7 @@
+.commerce-line-item-views-form tr.commerce_cart_accessory_row td {
+    background-color: #eee;
+}
+
+.commerce-line-item-views-form tr.commerce_cart_accessory_row td:first-child {
+    padding-left: 30px;
+}

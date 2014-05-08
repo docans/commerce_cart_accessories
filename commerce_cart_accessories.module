@@ -1,0 +1,263 @@
+<?php
+/**
+ * @file
+ * A module that lists a products accessories nested under the product in the cart
+ */
+ 
+function commerce_cart_accessories_help($path, $arg) {
+    switch ($path) {
+        case "admin/help#commerce_cart_accessories":
+        return '<p>' . t("Displayed accessories nested under their parent product in the cart") . '</p>';
+        break;
+    }
+}
+
+function commerce_cart_accessories_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id == 'field_ui_field_edit_form') {
+    /*
+     * Only add the option if this instance is attached to a Commerce Product
+     * entity, and the field is of type 'entityreference.'
+     */
+    if (isset($form['#instance']) && $form['#instance']['entity_type'] == 'commerce_product'
+        && $form['#field']['type'] == 'entityreference') {
+      $form['commerce_cart_accessories_settings'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Commerce Product Accessories Settings'),
+        '#collapsible' => FALSE,
+        '#collapsed' => FALSE,
+        '#weight' => -1,
+        );
+
+      $commerce_cart_accessories_settings = variable_get('commerce_cart_accessories_settings', array());
+      $instance_id = $form['#instance']['id'];
+
+      $form['commerce_cart_accessories_settings']['commerce_cart_accessories_on'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Offer products referenced with this field as an accessory on cart form.'),
+        '#description' => t('Each product referenced will be displayed within the cart form. You can control how
+                          a product is displayed by the editing Add-on view in
+                          the display settings of the product entity. If selected,
+                          the target type must be set to <strong>Commerce Product</strong>.'),
+        '#default_value' => isset($commerce_cart_accessories_settings[$instance_id])
+                            ? $commerce_cart_accessories_settings[$instance_id]
+                            : 0,
+        );
+
+      $form['#submit'][] = 'commerce_cart_accessories_field_settings_submit';
+
+      $form['#validate'][] = 'commerce_cart_accessories_field_settings_validate';
+
+    }
+
+  }
+  $line_item_form = FALSE;
+  // Is this a views form?
+  if (strpos($form_id, 'views_form_') === 0) {
+    $view = $form_state['build_info']['args'][0];
+    // Does the view contain one of the line item edit fields?
+    foreach ($view->field as $field_name => $field) {
+      if ($field instanceof commerce_line_item_handler_field_edit_delete || $field instanceof commerce_line_item_handler_field_edit_quantity) {
+        $line_item_form = TRUE;
+      }
+    }
+  }
+  // This is not the form we are looking for.
+  if (!$line_item_form) {
+    return;
+  }
+  // Require the existence of an order_id argument (and its value).
+  if (empty($view->argument['order_id']) || empty($view->argument['order_id']->value)) {
+    return;
+  }
+  
+  $form['#submit'][] = 'commerce_cart_accessories_checkout_submit';
+
+  $form['#attached']['css'][] = drupal_get_path('module', 'commerce_cart_accessories') . '/theme/commerce_cart_accessories.css';
+  $form['#attached']['js'][] = drupal_get_path('module', 'commerce_cart_accessories') . '/commerce_cart_accessories.js';
+}
+
+/*
+ * Validation handler for extra settings added to the field settings form
+ * Ensure that the entity type is set to Commerce Product.
+ */
+
+function commerce_cart_accessories_field_settings_validate($form, &$form_state) {
+  if ($form_state['values']['commerce_cart_accessories_on'] == 1
+      && $form_state['values']['field']['settings']['target_type'] != 'commerce_product') {
+    form_set_error('commerce_cart_accessories_settings', 'Since you have enabled <em>Product Add On Settings</em>, the target entity type must be <em>Commerce Product</em>.');
+  }
+}
+
+/*
+ * Submit handler for extra settings added to the field settings form
+ */
+
+function commerce_cart_accessories_field_settings_submit($form, &$form_state) {
+  $commerce_cart_accessories_settings = variable_get('commerce_cart_accessories_settings', array());
+  $commerce_cart_accessories_on = $form_state['values']['commerce_cart_accessories_on'];
+  $instance = isset($form_state['entityreference']['instance']) ? $form_state['entityreference']['instance'] : $form['#instance'];
+
+  // We save the settings keyed by field instance id.
+  $commerce_cart_accessories_settings[$instance['id']] = $commerce_cart_accessories_on;
+  variable_set('commerce_cart_accessories_settings', $commerce_cart_accessories_settings);
+}
+
+function commerce_cart_accessories_checkout_submit($form, &$form_state) {
+    $order = commerce_order_load($form_state['order']->order_id);
+    $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+    $line_items = $order_wrapper->commerce_line_items->value();
+    
+    foreach ($line_items as $line_item) {
+        $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+        
+        #delete any 0 quantity items.  we'll add any relevant ones back later
+        if ($line_item_wrapper->quantity->value() == 0) {
+            commerce_line_item_delete($line_item_wrapper->line_item_id->value());
+        }
+    }
+    commerce_order_save($order);
+}
+
+/*
+ * Implements hook_entity_info_alter().
+ */
+
+function commerce_cart_accessories_entity_info_alter(&$info) {
+  $info['commerce_product']['view modes']['commerce_cart_accessories'] = array(
+    'label' => t('Add On'),
+    'custom settings' => TRUE,
+    );
+}
+
+function commerce_cart_accessories_views_post_execute(&$view) {
+    if ($view->name === 'commerce_cart_form' && property_exists($view, 'product_accessory_mapping')) {
+        $added_product_ids = array();
+        $product_map = array();
+        
+        #fill the map
+        foreach ($view->result as $result) {
+            $product_id = $result->commerce_product_field_data_commerce_product_product_id;
+            $product_map[$product_id] = $result;
+        }
+        
+        #find the parent products and then add the accessories below it
+        $new_results = array();
+        foreach ($view->result as $result) {
+            $product_id = $result->commerce_product_field_data_commerce_product_product_id;
+            if (array_key_exists($product_id, $view->product_accessory_mapping) && count($view->product_accessory_mapping[$product_id]) > 0) {
+                $new_results[] = $result;
+                $added_product_ids[] = $product_id;
+                foreach ($view->product_accessory_mapping[$product_id] as $accessory_product_id) {
+                    if (array_key_exists($accessory_product_id, $product_map)) {
+                        $new_results[] = $product_map[$accessory_product_id];
+                        $product_map[$accessory_product_id]->is_accessory=TRUE;
+                        $added_product_ids[] = $accessory_product_id;
+                    }
+                }
+            }
+        }
+        
+        #add any remaining products that weren't readded
+        foreach (array_keys($product_map) as $product_id) {
+            if (!in_array($product_id, $added_product_ids)) {
+                $new_results[] = $product_map[$product_id];
+            }
+        }
+        
+        
+        $view->result = $new_results;
+    }
+}
+
+function commerce_cart_accessories_views_pre_execute(&$view) {
+    if ($view->name === 'commerce_cart_form' && $_SERVER['REQUEST_METHOD'] == 'GET') {
+        $view->product_accessory_mapping = array();
+        $order_id = $view->args[0];
+        $order = commerce_order_load($order_id);
+        $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+        if ($order_wrapper->status->value() === 'cart' || $order_wrapper->status->value() === 'checkout_checkout') {
+            $line_items = $order_wrapper->commerce_line_items->value();
+            $product_ids = array();
+            
+            foreach ($line_items as $line_item) {
+                $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+                
+                #delete any 0 quantity items.  we'll add any relevant ones back later
+                if ($line_item_wrapper->quantity->value() == 0) {
+                    commerce_line_item_delete($line_item_wrapper->line_item_id->value());
+                } else {
+                    $product_ids[] = $line_item_wrapper->commerce_product->value()->product_id;
+                }
+            }
+            foreach ($line_items as $line_item) {
+                $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+                
+                $product = $line_item_wrapper->commerce_product->value();
+                $product_wrapper = entity_metadata_wrapper('commerce_product', $product);
+                
+                // Does the product have an entityreference field with the Add On settings checked?
+                $instances = field_info_instances('commerce_product', $product->type);
+                $commerce_cart_accessories_settings = variable_get('commerce_cart_accessories_settings', array());
+                $commerce_cart_accessories_products = array();
+                
+                // Loop through all fields on the product, and check the instance ID to see if
+                // it is an entityreference field checked to be used as a product Add On.
+                foreach($instances as $field_name => $field_info) {
+                    if (!empty($commerce_cart_accessories_settings[$field_info['id']]) && $commerce_cart_accessories_settings[$field_info['id']] == 1 && !empty($product->$field_name)) {
+                        $all_field_info = field_info_field($field_name);
+                        // If cardinality of the field does not equal one, loop through the values of the field and put the products in the array.
+                        if ($all_field_info['cardinality'] != 1) {
+                            foreach($product_wrapper->{$field_name} as $field_value_wrapper) {
+                                $product_id = $field_value_wrapper->product_id->value();
+                                $commerce_cart_accessories_products[$product_id] = $field_value_wrapper->value();
+                            }
+                        } else {
+                            $product_id = $product_wrapper->{$field_name}->product_id->value();
+                            $commerce_cart_accessories_products[$product_id] = $product_wrapper->{$field_name}->value();
+                        }
+                    }
+                }
+
+                $view->product_accessory_mapping[$line_item_wrapper->commerce_product->value()->product_id] = array();
+                
+                foreach ($commerce_cart_accessories_products as $accessory) {
+                    $view->product_accessory_mapping[$line_item_wrapper->commerce_product->value()->product_id][] = $accessory->product_id;
+                    if (!in_array($accessory->product_id, $product_ids)) {
+                        $accessory_line_item = commerce_product_line_item_new($accessory, 0, $order_id);
+                        commerce_line_item_save($accessory_line_item);
+                        $order_wrapper->commerce_line_items[] = $accessory_line_item;
+                        $product_ids[] = $accessory->product_id;
+                    }
+                }
+            }
+            commerce_order_save($order);
+        }
+    }
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function commerce_cart_accessories_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'commerce_cart_accessories') . '/includes/views',
+  );
+}
+
+function commerce_cart_accessories_views_data_alter(&$data) {
+    $data['commerce_line_item']['edit_quantity']['field']['handler'] = 'commerce_cart_accessories_handler_field_edit_quantity';
+    $data['commerce_line_item']['edit_delete']['field']['handler'] = 'commerce_cart_accessories_handler_field_edit_delete';
+}
+
+function commerce_cart_accessories_preprocess(&$variables, $hook) {
+    if ($hook == 'views_secondary_row_view_table' && $variables['view']->name == 'commerce_cart_form') {
+        foreach ($variables['view']->result as $ndx => $result) {
+            if (property_exists($result, 'is_accessory') && $result->is_accessory) {
+                $variables['row_classes'][$ndx][] = 'commerce_cart_accessory_row';
+            } else {
+                $variables['row_classes'][$ndx][] = 'commerce_cart_non_accessory_row';
+            }
+        }
+    }
+}
