@@ -14,7 +14,7 @@
       });
       
       var num_cols = $('div.commerce-line-item-views-form thead tr th').length;
-      var accessory_header = $('<tr><td class="avail-acc" colspan="'+num_cols+'">Available Accessories</td></tr>');
+      var accessory_header = $('<tr class="toggle-wrapper"><td class="avail-acc" colspan="'+num_cols+'"><a href="#" class="togglelink">Available Accessories</a></td></tr>');
       $('.commerce_cart_non_accessory_row + .commerce_cart_accessory_row').before(accessory_header);
     }
   };
