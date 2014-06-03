@@ -1,0 +1,145 @@
+@charset "utf-8";
+/* CSS Document */
+
+/* pane titles    */
+
+
+.product-page-content h2.pane-title {
+
+    background-color:gray;
+    color:white;
+    margin: 30px 0px 10px 0px;
+    padding-left:10px;
+    font-size:100%;
+}
+
+
+.top-spec h2.pane-title {
+
+    background-color:gray;
+    color:white;
+    margin: 0px 0px 10px 0px;
+    padding-left:10px;
+    font-size:100%;
+    /*float:left;*/
+}
+
+.top-spec p{
+    padding:0px;
+    margin:0px;
+}
+
+
+/* Image display   */
+
+.image-display-row{
+    border:1px solid black;
+}
+
+td.image-display-row {
+    padding: 0px;
+}
+
+.image-display-row .field-type-commerce-price ,
+.image-display-row .field-type-commerce-product-reference,
+.image-display-row .views-field-sku{
+   padding-left:10px;
+}
+
+.image-display-row .field-name-field-product-model-label{
+   background-color:gray;
+    color:white;
+    margin:0px;
+    font-size:100%;
+    padding-left: 10px;
+}
+
+/*   to hide the required axteririx */
+
+
+.views-field-nothing span.field-content{
+    margin-left:10px;
+    }
+
+.image-display-row .form-type-select {
+    padding-left: 10px;
+}
+
+.image-display-row .views-field-field-product-1 {
+    padding-left: 10px;
+}
+
+.image-display-row .commerce-product-accessories .form-checkbox {
+ float:left;   
+}
+
+.image-display-row .commerce-product-accessories .form-item {
+   margin-bottom:3px; 
+}
+
+/* key specifications table */
+
+.key-specifications-table .views-table tr,
+.common-table .views-table tr,
+.60-hz-table .views-table tr,
+.50-hz-table .views-table tr{
+    font-size:0.95em;
+}
+
+.key-specifications-table .views-table td,
+.common-table .views-table td,
+.60-hz-table .views-table td,
+.50-hz-table .views-table td {
+    padding: 1px;
+}
+
+.key-specifications-table .views-table th{
+ text-decoration:none; 
+ font-weight:normal;
+ padding: 1px;
+ text-align:left;
+ width:40%;
+}
+
+.common-table .views-table th{
+ text-decoration:none; 
+ font-weight:normal;
+ padding: 1px;
+ text-align:left;
+ width:40%;
+}
+
+.60-hz-table .views-table th{
+ text-decoration:none; 
+ font-weight:normal;
+ padding: 1px;
+ text-align:left;
+ width:40%;
+}
+
+
+
+.50-hz-table .views-table th{
+ text-decoration:none; 
+ font-weight:normal;
+ padding: 1px;
+ text-align:left;
+ width:40%;  
+}
+
+
+
+/* order confirmation popup */
+
+
+#messages > div > div > div.view.view-confirm-message-product-display.view-id-confirm_message_product_display.view-display-id-default.contextual-links-region > div.view-content {
+    color:#000000;
+    font-size:100%;
+}
+
+#messages > div > div > div.view.view-confirm-message-product-display.view-id-confirm_message_product_display.view-display-id-default.contextual-links-region > div.view-content > div > div.views-field.views-field-quantity.field > span.views-label.views-label-quantity{
+    color:#000000;
+    font-size:100%;
+}
+
+
